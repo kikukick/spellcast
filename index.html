@@ -3,82 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OCRで文字認識</title>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js/dist/tesseract.min.js"></script>
+  <title>Spellcast Word Finder</title>
   <style>
-    #grid {
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    .grid {
       display: grid;
       grid-template-columns: repeat(5, 70px);
+      grid-template-rows: repeat(5, 90px);
       gap: 5px;
       justify-content: center;
       margin: 20px auto;
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 5px;
+      border-radius: 5px;
     }
     .cell input {
       width: 60px;
       height: 40px;
       text-align: center;
       font-size: 18px;
+      font-weight: bold;
+      border: 1px solid #ddd;
     }
-    #image-preview {
-      max-width: 300px;
-      margin: 20px auto;
+    .cell select {
+      width: 60px;
+      height: 25px;
+      font-size: 12px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <h1>スクリーンショットから文字を入力</h1>
-  <input type="file" id="image-input" accept="image/*">
-  <img id="image-preview" alt="画像プレビュー">
-  <div id="grid">
-    <!-- グリッドセル -->
-    <div class="cell"><input type="text" maxlength="1"></div>
-    <div class="cell"><input type="text" maxlength="1"></div>
-    <div class="cell"><input type="text" maxlength="1"></div>
-    <div class="cell"><input type="text" maxlength="1"></div>
-    <div class="cell"><input type="text" maxlength="1"></div>
-    <!-- 25セル分繰り返し -->
+  <h1>Spellcast Word Finder</h1>
+  <div class="grid" id="grid">
+    <!-- グリッドセルがここに挿入される -->
   </div>
-  <button onclick="extractText()">文字認識して入力</button>
+  <button onclick="findWords()">単語を検索</button>
+  <p id="result">単語を検索して結果を表示します。</p>
 
   <script>
-    const imageInput = document.getElementById("image-input");
-    const imagePreview = document.getElementById("image-preview");
-    const gridInputs = document.querySelectorAll("#grid .cell input");
+    const gridSize = 5;
+    const gridElement = document.getElementById('grid');
+    const specialEffects = ["", "DL", "TL", "DW", "TW"]; // 効果の種類
 
-    // 画像プレビュー表示
-    imageInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          imagePreview.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+    // Scrabble スコア
+    const letterScores = {
+      A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2,
+      H: 4, I: 1, J: 8, K: 5, L: 1, M: 3, N: 1,
+      O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1, U: 1,
+      V: 4, W: 4, X: 8, Y: 4, Z: 10,
+    };
 
-    // 文字認識してグリッドに入力
-    function extractText() {
-      if (!imagePreview.src) {
-        alert("画像を選択してください");
-        return;
-      }
+    let dictionary = []; // 辞書データを格納
 
-      Tesseract.recognize(
-        imagePreview.src, // 認識する画像
-        "eng", // 言語データ（英語）
-        {
-          logger: (m) => console.log(m), // 認識の進行状況をログに表示
-        }
-      ).then(({ data: { text } }) => {
-        console.log("認識結果:", text);
+    // 外部辞書ファイルを読み込む
+    fetch('https://raw.githubusercontent.com/vscala/Spellcast-Word-Finder/main/words.txt')
+      .then(response => response.text())
+      .then(data => {
+        dictionary = data.split('\n').map(word => word.trim().toUpperCase());
+        console.log('辞書データがロードされました:', dictionary);
+      })
+      .catch(error => console.error('辞書データの読み込みに失敗しました:', error));
 
-        // 認識結果を1文字ずつ分割してグリッドに入力
-        const letters = text.replace(/\s/g, "").toUpperCase().split(""); // 空白を削除し大文字に変換
-        gridInputs.forEach((input, index) => {
-          input.value = letters[index] || ""; // 認識結果があれば入力
-        });
+    // グリッドを生成
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      // 文字入力フィールド
+      const input = document.createElement('input');
+      input.maxLength = 1; // 1文字のみ入力
+      cell.appendChild(input);
+
+      // 特殊効果選択ドロップダウン
+      const select = document.createElement('select');
+      specialEffects.forEach(effect => {
+        const option = document.createElement('option');
+        option.value = effect;
+        option.textContent = effect;
+        select.appendChild(option);
       });
+      cell.appendChild(select);
+
+      gridElement.appendChild(cell);
+    }
+
+    // 最適解を探す
+    function findWords() {
+      const letters = Array.from(document.querySelectorAll('.cell input'))
+        .map(input => input.value.toUpperCase()); // 大文字に変換
+      const effects = Array.from(document.querySelectorAll('.cell select'))
+        .map(select => select.value);
+
+      // 5×5の2次元配列に変換
+      const grid = [];
+      const gridEffects = [];
+      for (let i = 0; i < gridSize; i++) {
+        grid.push(letters.slice(i * gridSize, i * gridSize + gridSize));
+        gridEffects.push(effects.slice(i * gridSize, i * gridSize + gridSize));
+      }
+
+      const foundWords = [];
+
+      // 辞書内の単語をグリッドで探す
+      dictionary.forEach(word => {
+        const score = calculateWordScore(grid, gridEffects, word);
+        if (score > 0) {
+          foundWords.push({ word, score });
+        }
+      });
+
+      // 結果を表示
+      foundWords.sort((a, b) => b.score - a.score); // スコア順に並べ替え
+      const resultText = foundWords.map(entry => `${entry.word} (${entry.score}点)`).join('\n');
+      document.getElementById('result').textContent = `見つかった単語:\n${resultText}`;
+    }
+
+    // スコアを計算する
+    function calculateWordScore(grid, gridEffects, word) {
+      const visited = Array.from({ length: gridSize }, () =>
+        Array(gridSize).fill(false)
+      );
+
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          const score = dfsScore(grid, gridEffects, word, 0, row, col, visited, 1);
+          if (score > 0) return score; // スコアが見つかれば返す
+        }
+      }
+      return 0; // 単語が見つからなければスコアは0
+    }
+
+    // DFSでスコア計算しながら探索
+    function dfsScore(grid, gridEffects, word, index, row, col, visited, wordMultiplier) {
+      if (index === word.length) return 0; // 単語が完成
+
+      if (
+        row < 0 || col < 0 || row >= gridSize || col >= gridSize ||
+        visited[row][col] || grid[row][col] !== word[index]
+      ) {
+        return 0;
+      }
+
+      visited[row][col] = true;
+
+      // 現在の文字のスコアを計算
+      let letterScore = letterScores[word[index]] || 0;
+      if (gridEffects[row][col] === "DL") letterScore *= 2;
+      if (gridEffects[row][col] === "TL") letterScore *= 3;
+
+      // 単語効果を考慮
+      if (gridEffects[row][col] === "DW") wordMultiplier *= 2;
+      if (gridEffects[row][col] === "TW") wordMultiplier *= 3;
+
+      // 8方向を探索
+      const directions = [
+        [-1, 0], [1, 0], [0, -1], [0, 1],
+        [-1, -1], [-1, 1], [1, -1], [1, 1],
+      ];
+      let maxScore = 0;
+      for (const [dx, dy] of directions) {
+        maxScore = Math.max(maxScore, dfsScore(grid, gridEffects, word, index + 1, row + dx, col + dy, visited, wordMultiplier));
+      }
+
+      visited[row][col] = false;
+      return letterScore + maxScore * wordMultiplier;
     }
   </script>
 </body>
