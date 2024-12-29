@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spellcast Solver</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 70px);
+      grid-template-rows: repeat(5, 90px);
+      gap: 5px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    .cell input {
+      width: 60px;
+      height: 40px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border: 1px solid #ddd;
+    }
+    .cell select {
+      width: 60px;
+      height: 25px;
+      font-size: 12px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Spellcast Solver</h1>
+  <div class="grid" id="grid">
+    <!-- グリッドセルがここに挿入される -->
+  </div>
+  <button onclick="findWords()">最適解を探す</button>
+  <p id="result"></p>
+
+  <script>
+    const gridSize = 5;
+    const gridElement = document.getElementById('grid');
+    const specialEffects = ["", "DL", "TL", "DW", "TW"]; // 効果の種類
+
+    // グリッドを生成
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      // 文字入力フィールド
+      const input = document.createElement('input');
+      input.maxLength = 1; // 1文字のみ入力
+      cell.appendChild(input);
+
+      // 特殊効果選択ドロップダウン
+      const select = document.createElement('select');
+      specialEffects.forEach(effect => {
+        const option = document.createElement('option');
+        option.value = effect;
+        option.textContent = effect;
+        select.appendChild(option);
+      });
+      cell.appendChild(select);
+
+      gridElement.appendChild(cell);
+    }
+
+    // 辞書データ（例として小型辞書を使用）
+    const dictionary = [
+      "STONE", "NOTE", "WORD", "TEST", "CODE", "CAST", "SPELL", "STACK"
+    ];
+
+    // 最適解を探す
+    function findWords() {
+      const letters = Array.from(document.querySelectorAll('.cell input'))
+        .map(input => input.value.toUpperCase());
+      const effects = Array.from(document.querySelectorAll('.cell select'))
+        .map(select => select.value);
+
+      // 5×5の2次元配列に変換
+      const grid = [];
+      const gridEffects = [];
+      for (let i = 0; i < gridSize; i++) {
+        grid.push(letters.slice(i * gridSize, i * gridSize + gridSize));
+        gridEffects.push(effects.slice(i * gridSize, i * gridSize + gridSize));
+      }
+
+      const foundWords = [];
+
+      // 辞書内の単語をグリッドで探す
+      dictionary.forEach(word => {
+        if (isWordInGrid(grid, word)) {
+          foundWords.push(word); // 簡易検索結果（スコアは未計算）
+        }
+      });
+
+      // 結果を表示
+      document.getElementById('result').textContent = `見つかった単語: ${foundWords.join(', ')}`;
+    }
+
+    // グリッド内の単語検索（縦・横検索）
+    function isWordInGrid(grid, word) {
+      // 横方向検索
+      for (let row of grid) {
+        if (row.join('').includes(word)) return true;
+      }
+      // 縦方向検索
+      for (let col = 0; col < gridSize; col++) {
+        const column = grid.map(row => row[col]).join('');
+        if (column.includes(word)) return true;
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>
