@@ -65,6 +65,14 @@
     const gridElement = document.getElementById('grid');
     const specialEffects = ["", "DL", "TL", "DW", "TW"]; // 効果の種類
 
+    // Scrabble スコア
+    const letterScores = {
+      A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2,
+      H: 4, I: 1, J: 8, K: 5, L: 1, M: 3, N: 1,
+      O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1, U: 1,
+      V: 4, W: 4, X: 8, Y: 4, Z: 10,
+    };
+
     // グリッドを生成
     for (let i = 0; i < gridSize * gridSize; i++) {
       const cell = document.createElement('div');
@@ -88,7 +96,7 @@
       gridElement.appendChild(cell);
     }
 
-    // 辞書データ（簡易版）
+    // 辞書データ
     const dictionary = [
       "STONE", "NOTE", "WORD", "TEST", "CODE", "CAST", "SPELL", "STACK", "HALLO"
     ];
@@ -102,70 +110,77 @@
 
       // 5×5の2次元配列に変換
       const grid = [];
+      const gridEffects = [];
       for (let i = 0; i < gridSize; i++) {
         grid.push(letters.slice(i * gridSize, i * gridSize + gridSize));
+        gridEffects.push(effects.slice(i * gridSize, i * gridSize + gridSize));
       }
 
       const foundWords = [];
 
       // 辞書内の単語をグリッドで探す
       dictionary.forEach(word => {
-        if (canFormWord(grid, word)) {
-          foundWords.push(word); // 見つかった単語を追加
+        const score = calculateWordScore(grid, gridEffects, word);
+        if (score > 0) {
+          foundWords.push({ word, score });
         }
       });
 
       // 結果を表示
-      document.getElementById('result').textContent = `見つかった単語: ${foundWords.join(', ')}`;
+      foundWords.sort((a, b) => b.score - a.score); // スコア順に並べ替え
+      const resultText = foundWords.map(entry => `${entry.word} (${entry.score}点)`).join(', ');
+      document.getElementById('result').textContent = `見つかった単語: ${resultText}`;
     }
 
-    // グリッド内で単語を形成できるか確認
-    function canFormWord(grid, word) {
+    // スコアを計算する
+    function calculateWordScore(grid, gridEffects, word) {
       const visited = Array.from({ length: gridSize }, () =>
         Array(gridSize).fill(false)
       );
 
-      // 各セルを起点に探索開始
       for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
-          if (dfs(grid, word, 0, row, col, visited)) {
-            return true;
-          }
+          const score = dfsScore(grid, gridEffects, word, 0, row, col, visited, 1);
+          if (score > 0) return score; // スコアが見つかれば返す
         }
       }
-      return false;
+      return 0; // 単語が見つからなければスコアは0
     }
 
-    // 深さ優先探索 (DFS) で単語を探す
-    function dfs(grid, word, index, row, col, visited) {
-      if (index === word.length) return true; // 単語を完全にマッチ
+    // DFSでスコア計算しながら探索
+    function dfsScore(grid, gridEffects, word, index, row, col, visited, wordMultiplier) {
+      if (index === word.length) return 0; // 単語が完成
+
       if (
-        row < 0 ||
-        col < 0 ||
-        row >= gridSize ||
-        col >= gridSize ||
-        visited[row][col] ||
-        grid[row][col] !== word[index]
+        row < 0 || col < 0 || row >= gridSize || col >= gridSize ||
+        visited[row][col] || grid[row][col] !== word[index]
       ) {
-        return false;
+        return 0;
       }
 
       visited[row][col] = true;
+
+      // 現在の文字のスコアを計算
+      let letterScore = letterScores[word[index]] || 0;
+      if (gridEffects[row][col] === "DL") letterScore *= 2;
+      if (gridEffects[row][col] === "TL") letterScore *= 3;
+
+      // 単語効果を考慮
+      if (gridEffects[row][col] === "DW") wordMultiplier *= 2;
+      if (gridEffects[row][col] === "TW") wordMultiplier *= 3;
 
       // 8方向を探索
       const directions = [
         [-1, 0], [1, 0], [0, -1], [0, 1],
         [-1, -1], [-1, 1], [1, -1], [1, 1],
       ];
-
+      let maxScore = 0;
       for (const [dx, dy] of directions) {
-        if (dfs(grid, word, index + 1, row + dx, col + dy, visited)) {
-          return true;
-        }
+        maxScore = Math.max(maxScore, dfsScore(grid, gridEffects, word, index + 1, row + dx, col + dy, visited, wordMultiplier));
       }
 
-      visited[row][col] = false; // 探索終了後に訪問状態をリセット
-      return false;
+      visited[row][col] = false;
+      return letterScore + maxScore * wordMultiplier;
     }
   </script>
 </body>
