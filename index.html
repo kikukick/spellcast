@@ -88,32 +88,30 @@
       gridElement.appendChild(cell);
     }
 
-    // 辞書データ（例として小型辞書を使用）
+    // 辞書データ（簡易版）
     const dictionary = [
-      "STONE", "NOTE", "WORD", "TEST", "CODE", "CAST", "SPELL", "STACK"
+      "STONE", "NOTE", "WORD", "TEST", "CODE", "CAST", "SPELL", "STACK", "HALLO"
     ];
 
     // 最適解を探す
     function findWords() {
       const letters = Array.from(document.querySelectorAll('.cell input'))
-        .map(input => input.value.toUpperCase());
+        .map(input => input.value.toUpperCase()); // 大文字に変換
       const effects = Array.from(document.querySelectorAll('.cell select'))
         .map(select => select.value);
 
       // 5×5の2次元配列に変換
       const grid = [];
-      const gridEffects = [];
       for (let i = 0; i < gridSize; i++) {
         grid.push(letters.slice(i * gridSize, i * gridSize + gridSize));
-        gridEffects.push(effects.slice(i * gridSize, i * gridSize + gridSize));
       }
 
       const foundWords = [];
 
       // 辞書内の単語をグリッドで探す
       dictionary.forEach(word => {
-        if (isWordInGrid(grid, word)) {
-          foundWords.push(word); // 簡易検索結果（スコアは未計算）
+        if (canFormWord(grid, word)) {
+          foundWords.push(word); // 見つかった単語を追加
         }
       });
 
@@ -121,17 +119,52 @@
       document.getElementById('result').textContent = `見つかった単語: ${foundWords.join(', ')}`;
     }
 
-    // グリッド内の単語検索（縦・横検索）
-    function isWordInGrid(grid, word) {
-      // 横方向検索
-      for (let row of grid) {
-        if (row.join('').includes(word)) return true;
+    // グリッド内で単語を形成できるか確認
+    function canFormWord(grid, word) {
+      const visited = Array.from({ length: gridSize }, () =>
+        Array(gridSize).fill(false)
+      );
+
+      // 各セルを起点に探索開始
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          if (dfs(grid, word, 0, row, col, visited)) {
+            return true;
+          }
+        }
       }
-      // 縦方向検索
-      for (let col = 0; col < gridSize; col++) {
-        const column = grid.map(row => row[col]).join('');
-        if (column.includes(word)) return true;
+      return false;
+    }
+
+    // 深さ優先探索 (DFS) で単語を探す
+    function dfs(grid, word, index, row, col, visited) {
+      if (index === word.length) return true; // 単語を完全にマッチ
+      if (
+        row < 0 ||
+        col < 0 ||
+        row >= gridSize ||
+        col >= gridSize ||
+        visited[row][col] ||
+        grid[row][col] !== word[index]
+      ) {
+        return false;
       }
+
+      visited[row][col] = true;
+
+      // 8方向を探索
+      const directions = [
+        [-1, 0], [1, 0], [0, -1], [0, 1],
+        [-1, -1], [-1, 1], [1, -1], [1, 1],
+      ];
+
+      for (const [dx, dy] of directions) {
+        if (dfs(grid, word, index + 1, row + dx, col + dy, visited)) {
+          return true;
+        }
+      }
+
+      visited[row][col] = false; // 探索終了後に訪問状態をリセット
       return false;
     }
   </script>
